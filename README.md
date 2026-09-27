@@ -1,66 +1,151 @@
-# rakib-gallery-api
+# 📸 Rakib Gallery
 
-Private Android Gallery API + mobile web viewer for Termux.
+A lightweight personal Android Gallery Web App built with Node.js + Express.
 
-## Features
+## ✨ Features
 
-- Browse Android internal storage folders
-- Images and videos
-- Fullscreen image/video viewer
-- Search
-- Folder navigation
-- Download files
-- Password protection
-- JSON API
-- No file upload endpoint by default
+- 📂 File-manager style Gallery
+- 🖼️ Image preview
+- 🎥 Video preview
+- 📁 Folder navigation
+- 🔍 File search
+- 📥 File download
+- 📊 File size and date information
+- 🕘 Private History Vault
+- 🔐 Separate History password
+- 📱 Device-specific browsing history
+- ⚡ Lightweight Express server
+- 📱 Android / Termux friendly
+- 🛡️ Path traversal protection
+- 🚫 No password required for normal Gallery
 
-## Termux setup
+## 🚀 Installation
 
-```bash
-termux-setup-storage
-pkg update
-pkg install nodejs -y
-cd rakib-gallery-api
-npm install
-cp .env.example .env
-nano .env
-npm start
-```
+    git clone <YOUR-REPOSITORY-URL>
+    cd rakib-gallery-api
+    npm install
 
-Default local URL:
+## ⚙️ Configuration
 
-```text
-http://127.0.0.1:3000
-```
+Create a .env file:
 
-From another device on the same Wi-Fi, use the phone's LAN IP:
+    PORT=3000
+    ROOT=/sdcard
+    HISTORY_PASSWORD=your-strong-password
 
-```text
-http://PHONE-IP:3000
-```
+Change HISTORY_PASSWORD to your own strong password.
 
-## Environment
+## ▶️ Start
 
-```env
-PORT=3000
-GALLERY_ROOT=/storage/emulated/0
-GALLERY_PASSWORD=change-this-password
-HOST=0.0.0.0
-```
+    npm start
 
-Change `GALLERY_PASSWORD` before exposing the server outside your phone.
+Open:
 
-## API
+    http://127.0.0.1:3000
 
-```text
-GET /api/health
-GET /api/list?path=
-GET /api/search?q=
-GET /api/file?path=
-```
+For LAN access:
 
-The server prevents path traversal outside `GALLERY_ROOT`.
+    http://YOUR-PHONE-IP:3000
 
-## Important
+## 🗂️ Supported Images
 
-For an internet-accessible HTTPS URL, run this server on the phone and expose it through a secure tunnel/reverse proxy. Do not expose an unauthenticated gallery server directly to the public internet.
+- JPG
+- JPEG
+- PNG
+- GIF
+- WEBP
+- BMP
+- HEIC
+- HEIF
+- AVIF
+
+## 🎥 Supported Videos
+
+- MP4
+- MKV
+- WEBM
+- MOV
+- AVI
+- M4V
+- 3GP
+
+## 🔐 History Vault
+
+Normal Gallery browsing does not require a password.
+
+History is protected separately using HISTORY_PASSWORD.
+
+History is also separated by browser/device ID.
+
+Each browser generates its own device ID and stores it locally.
+
+## 🛡️ Security
+
+The server includes path traversal protection.
+
+For public internet access:
+
+- Use HTTPS.
+- Use a strong History password.
+- Avoid directly exposing port 3000.
+- Prefer a secure tunnel or reverse proxy.
+- Do not store highly sensitive files in a public gallery.
+
+## 📱 Android / Termux
+
+Example:
+
+    pkg update
+    pkg install nodejs
+    termux-setup-storage
+    cd ~/rakib-gallery-api
+    npm install
+    npm start
+
+The default gallery root is /sdcard.
+
+## 🧪 Health Check
+
+    curl http://127.0.0.1:3000/api/health
+
+## 🧰 Development
+
+Check server syntax:
+
+    node --check server.js
+
+Check Git formatting:
+
+    git diff --check
+
+## 📁 Project Structure
+
+    rakib-gallery-api/
+    ├── public/
+    │   ├── index.html
+    │   ├── app.js
+    │   └── style.css
+    ├── server.js
+    ├── package.json
+    ├── package-lock.json
+    ├── .env
+    ├── history.json
+    ├── README.md
+    ├── LICENSE
+    └── .gitignore
+
+## 📜 License
+
+This project is released under the MIT License.
+
+See LICENSE for details.
+
+## 👤 Author
+
+Rakib Hasan
+
+Personal Android / Termux Gallery project.
+
+---
+
+ If you find this project useful, consider giving it a star on GitHub.
