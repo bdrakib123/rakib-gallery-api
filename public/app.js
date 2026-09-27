@@ -1,3 +1,59 @@
+
+/*
+ * Device identity is now handled automatically
+ * by the server using an HttpOnly cookie.
+ */
+
+async function ensureDevice() {
+  try {
+    const res = await fetch("/api/device/me", {
+      credentials: "same-origin"
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+
+      window.DEVICE_NAME =
+        data.device.name;
+
+      return true;
+    }
+
+    /*
+     * A protected API request automatically creates
+     * a new device cookie on the server.
+     */
+    const init = await fetch("/api/list", {
+      credentials: "same-origin"
+    });
+
+    if (!init.ok) {
+      throw new Error(
+        "Unable to create device"
+      );
+    }
+
+    const data = await init.json();
+
+    if (data.device) {
+      window.DEVICE_NAME =
+        data.device.name;
+    }
+
+    return true;
+
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+async function deviceFetch(url, options = {}) {
+  options.credentials = "same-origin";
+
+  return fetch(url, options);
+}
+
 const $ = id => document.getElementById(id);
 
 const content = $("content");
@@ -27,22 +83,6 @@ let currentPath = "";
 let pathStack = [];
 let historyUnlocked = false;
 let historyPass = "";
-
-const DEVICE_KEY = "rakib_gallery_device_id";
-
-function deviceId() {
-  let id = localStorage.getItem(DEVICE_KEY);
-
-  if (!id) {
-    id =
-      "device-" +
-      crypto.randomUUID().replaceAll("-", "").slice(0, 24);
-
-    localStorage.setItem(DEVICE_KEY, id);
-  }
-
-  return id;
-}
 
 function api(url, params = {}) {
   const u = new URL(url, location.origin);
@@ -96,13 +136,12 @@ function downloadUrl(path) {
 
 async function recordHistory(path, action) {
   try {
-    await fetch("/api/history", {
+    await deviceFetch("/api/history", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        deviceId: deviceId(),
         path,
         action
       })
@@ -117,7 +156,7 @@ async function loadFolder(folder = "") {
     `<div class="loading">Loading...</div>`;
 
   try {
-    const res = await fetch(
+    const res = await deviceFetch(
       api("/api/list", { path: folder })
     );
 
@@ -377,7 +416,7 @@ async function performSearch(q) {
     `<div class="loading">Searching...</div>`;
 
   try {
-    const res = await fetch(
+    const res = await deviceFetch(
       api("/api/search", { q })
     );
 
@@ -488,9 +527,8 @@ historyLoginBtn.addEventListener("click", async () => {
   historyError.textContent = "Checking...";
 
   try {
-    const res = await fetch(
+    const res = await deviceFetch(
       api("/api/history", {
-        deviceId: deviceId(),
         password: pass
       })
     );
@@ -519,9 +557,8 @@ async function loadHistory() {
     `<div class="loading">Loading history...</div>`;
 
   try {
-    const res = await fetch(
+    const res = await deviceFetch(
       api("/api/history", {
-        deviceId: deviceId(),
         password: historyPass
       })
     );
@@ -588,10 +625,8 @@ async function loadHistory() {
 clearHistory.addEventListener("click", async () => {
   if (!confirm("Clear this device's history?")) return;
 
-  await fetch(
-    api("/api/history", {
-      deviceId: deviceId()
-    }),
+  await deviceFetch(
+    api("/api/history"),
     {
       method: "DELETE",
       headers: {
@@ -603,4 +638,184 @@ clearHistory.addEventListener("click", async () => {
   loadHistory();
 });
 
-loadFolder("");
+ensureDevice()
+  .then(() => loadFolder(""))
+  .catch(err => {
+    content.innerHTML = `
+      <div class="error-box">
+        ⚠️ ${escapeHtml(err.message)}
+      </div>
+    `;
+  });
+
+
+/* =================================================
+   PAIR SYNC
+================================================= */
+
+const pairSyncBtn = $("pairSyncBtn");
+const pairSyncModal = $("pairSyncModal");
+const closePairSync = $("closePairSync");
+
+const pairLoading = $("pairLoading");
+const pairCode = $("pairCode");
+const pairTimer = $("pairTimer");
+const pairInstructions = $("pairInstructions");
+const pairCommand = $("pairCommand");
+const pairError = $("pairError");
+
+let pairTimerInterval = null;
+
+
+function closePairModal() {
+
+  if (pairTimerInterval) {
+    clearInterval(pairTimerInterval);
+    pairTimerInterval = null;
+  }
+
+  pairSyncModal.classList.add("hidden");
+}
+
+
+function showPairModal() {
+
+  pairSyncModal.classList.remove("hidden");
+
+  pairLoading.classList.remove("hidden");
+  pairCode.classList.add("hidden");
+  pairInstructions.classList.add("hidden");
+
+  pairError.textContent = "";
+  pairTimer.textContent = "";
+}
+
+
+async function startPairing() {
+
+  showPairModal();
+
+  try {
+
+    const res = await deviceFetch(
+      "/api/device/pair/start",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      throw new Error(
+        data.error ||
+        "Unable to generate pairing code"
+      );
+    }
+
+    pairLoading.classList.add("hidden");
+
+    pairCode.textContent = data.code;
+
+    pairCode.classList.remove("hidden");
+
+    pairInstructions.classList.remove(
+      "hidden"
+    );
+
+    pairCommand.textContent =
+      `python sync.py --pair ${data.code}`;
+
+    let remaining = data.expiresIn || 300;
+
+    updatePairTimer(remaining);
+
+    if (pairTimerInterval) {
+      clearInterval(pairTimerInterval);
+    }
+
+    pairTimerInterval = setInterval(() => {
+
+      remaining--;
+
+      updatePairTimer(remaining);
+
+      if (remaining <= 0) {
+
+        clearInterval(
+          pairTimerInterval
+        );
+
+        pairTimerInterval = null;
+
+        pairTimer.textContent =
+          "⏱️ Pairing code expired.";
+
+      }
+
+    }, 1000);
+
+  } catch (error) {
+
+    pairLoading.classList.add("hidden");
+
+    pairError.textContent =
+      "❌ " + error.message;
+  }
+}
+
+
+function updatePairTimer(seconds) {
+
+  const min =
+    Math.floor(seconds / 60);
+
+  const sec =
+    String(seconds % 60)
+      .padStart(2, "0");
+
+  pairTimer.textContent =
+    `Expires in ${min}:${sec}`;
+}
+
+
+if (pairSyncBtn) {
+
+  pairSyncBtn.addEventListener(
+    "click",
+    startPairing
+  );
+
+}
+
+
+if (closePairSync) {
+
+  closePairSync.addEventListener(
+    "click",
+    closePairModal
+  );
+
+}
+
+
+if (pairSyncModal) {
+
+  pairSyncModal.addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target ===
+        pairSyncModal
+      ) {
+        closePairModal();
+      }
+
+    }
+  );
+
+}

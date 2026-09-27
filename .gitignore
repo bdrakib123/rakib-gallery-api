@@ -4,3 +4,22 @@ history.json
 history.old.json
 *.log
 .DS_Store
+
+# Local Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Local test/session files
+cookies.txt
+test-cookie.txt
+
+# Local gallery data
+data/
+
+# Local backup/patch files
+public.backup/
+server.js.backup
+patch_auto_device.py
+patch_auto_frontend.py
+setup_v4.py

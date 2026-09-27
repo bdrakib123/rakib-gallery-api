@@ -19,6 +19,7 @@
     </div>
   </div>
 
+  <button id="pairSyncBtn" class="top-btn">🔗 Pair Sync</button>
   <button id="historyBtn" class="top-btn">🔐 History</button>
 </header>
 
@@ -92,5 +93,68 @@
 </div>
 
 <script src="/app.js?v=3"></script>
+
+<!-- PAIR SYNC MODAL -->
+<div id="pairSyncModal" class="modal hidden">
+
+  <div class="modal-box pair-modal">
+
+    <button
+      id="closePairSync"
+      class="modal-close"
+      type="button"
+    >×</button>
+
+    <div class="pair-icon">🔗</div>
+
+    <h2>Pair Android Sync</h2>
+
+    <p class="pair-description">
+      Connect this device's Android storage
+      to its Rakib Gallery.
+    </p>
+
+    <div
+      id="pairLoading"
+      class="pair-loading"
+    >
+      Generating pairing code...
+    </div>
+
+    <div
+      id="pairCode"
+      class="pair-code hidden"
+    >------</div>
+
+    <div
+      id="pairTimer"
+      class="pair-timer"
+    ></div>
+
+    <div
+      id="pairInstructions"
+      class="pair-instructions hidden"
+    >
+      <b>On Termux:</b>
+
+      <code id="pairCommand">
+        python sync.py --pair CODE
+      </code>
+
+      <p>
+        Replace <b>CODE</b> with the 6-digit
+        code above.
+      </p>
+    </div>
+
+    <div
+      id="pairError"
+      class="pair-error"
+    ></div>
+
+  </div>
+
+</div>
+
 </body>
 </html>

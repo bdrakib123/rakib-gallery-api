@@ -558,3 +558,64 @@ section {
     border-radius: 22px;
   }
 }
+
+
+/* =================================================
+   PAIR SYNC
+================================================= */
+
+.pair-modal {
+  text-align: center;
+  position: relative;
+  max-width: 420px;
+}
+
+.pair-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.pair-description {
+  opacity: .7;
+  line-height: 1.5;
+}
+
+.pair-code {
+  margin: 24px auto 12px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12);
+  user-select: all;
+}
+
+.pair-timer {
+  font-size: 13px;
+  opacity: .65;
+  margin-bottom: 18px;
+}
+
+.pair-instructions {
+  text-align: left;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  line-height: 1.6;
+}
+
+.pair-instructions code {
+  display: block;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  user-select: all;
+}
+
+.pair-error {
+  color: #ff6b6b;
+  margin-top: 14px;
+}
