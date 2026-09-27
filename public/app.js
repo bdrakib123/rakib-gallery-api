@@ -1,1240 +1,606 @@
-// RAKIB FINAL DEVICE HISTORY UI
-// Gallery = public
-// History = private password vault
+const $ = id => document.getElementById(id);
 
-// =========================================================
-// RAKIB GALLERY
-// Public Gallery + Private Device History
-// =========================================================
+const content = $("content");
+const breadcrumb = $("breadcrumb");
+const backBtn = $("backBtn");
+const refreshBtn = $("refreshBtn");
+const search = $("search");
+
+const viewer = $("viewer");
+const viewerBody = $("viewerBody");
+const viewerName = $("viewerName");
+const downloadBtn = $("downloadBtn");
+const closeViewer = $("closeViewer");
+
+const historyBtn = $("historyBtn");
+const historyModal = $("historyModal");
+const closeHistory = $("closeHistory");
+const historyLogin = $("historyLogin");
+const historyPassword = $("historyPassword");
+const historyLoginBtn = $("historyLoginBtn");
+const historyError = $("historyError");
+const historyContent = $("historyContent");
+const historyList = $("historyList");
+const clearHistory = $("clearHistory");
 
 let currentPath = "";
+let pathStack = [];
+let historyUnlocked = false;
+let historyPass = "";
 
-const $ = id =>
-  document.getElementById(id);
+const DEVICE_KEY = "rakib_gallery_device_id";
 
-const gallery =
-  $("gallery");
+function deviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
 
-const grid =
-  $("grid");
+  if (!id) {
+    id =
+      "device-" +
+      crypto.randomUUID().replaceAll("-", "").slice(0, 24);
 
-const statusEl =
-  $("status");
+    localStorage.setItem(DEVICE_KEY, id);
+  }
 
-const viewer =
-  $("viewer");
-
-const viewerContent =
-  $("viewerContent");
-
-const downloadBtn =
-  $("downloadBtn");
-
-const viewerName =
-  $("viewerName");
-
-const historyPanel =
-  $("historyPanel");
-
-const historyList =
-  $("historyList");
-
-const bottomNav =
-  $("bottomNav");
-
-
-// =========================================================
-// DEVICE ID
-// =========================================================
-
-let deviceId =
-  localStorage.getItem(
-    "rakibGalleryDeviceId"
-  );
-
-if (!deviceId) {
-
-  deviceId =
-    "device_" +
-    crypto.randomUUID()
-      .replace(/-/g, "");
-
-  localStorage.setItem(
-    "rakibGalleryDeviceId",
-    deviceId
-  );
-
+  return id;
 }
 
+function api(url, params = {}) {
+  const u = new URL(url, location.origin);
 
-// =========================================================
-// API
-// =========================================================
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      u.searchParams.set(key, value);
+    }
+  });
 
-function api(url) {
-  return url;
+  return u.toString();
 }
 
-
-// =========================================================
-// HELPERS
-// =========================================================
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function formatSize(bytes) {
+  if (!bytes) return "0 B";
 
-  if (bytes == null)
-    return "";
-
-  const units =
-    ["B","KB","MB","GB","TB"];
-
-  let n = bytes;
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let i = 0;
+  let n = bytes;
 
-  while (
-    n >= 1024 &&
-    i < units.length - 1
-  ) {
-
+  while (n >= 1024 && i < units.length - 1) {
     n /= 1024;
     i++;
-
   }
 
-  return (
-    n.toFixed(i ? 1 : 0) +
-    " " +
-    units[i]
-  );
-
+  return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
 }
 
+function formatDate(ms) {
+  if (!ms) return "";
 
-function formatDate(time) {
+  return new Date(ms).toLocaleString();
+}
 
-  return new Date(time)
-    .toLocaleString([], {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+function fileUrl(path) {
+  return api("/api/file", { path });
+}
+
+function downloadUrl(path) {
+  return api("/api/download", { path });
+}
+
+async function recordHistory(path, action) {
+  try {
+    await fetch("/api/history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        deviceId: deviceId(),
+        path,
+        action
+      })
     });
-
-}
-
-
-function fileUrl(item) {
-
-  return (
-    "/api/file?path=" +
-    encodeURIComponent(
-      item.path
-    )
-  );
-
-}
-
-
-function escapeHtml(s) {
-
-  return String(s)
-    .replace(
-      /[&<>"']/g,
-      c => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;"
-      }[c])
-    );
-
-}
-
-
-// =========================================================
-// HISTORY WRITE
-// =========================================================
-
-async function recordHistory(
-  action,
-  item
-) {
-
-  try {
-
-    await fetch(
-      "/api/history",
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify({
-            deviceId,
-
-            action,
-
-            path:
-              item.path,
-
-            userAgent:
-              navigator.userAgent
-          })
-      }
-    );
-
   } catch {}
-
 }
 
+async function loadFolder(folder = "") {
+  currentPath = folder;
 
-// =========================================================
-// FOLDER
-// =========================================================
-
-async function loadFolder(
-  p = ""
-) {
-
-  showGallery();
-
-  statusEl.textContent =
-    "Loading…";
+  content.innerHTML =
+    `<div class="loading">Loading...</div>`;
 
   try {
+    const res = await fetch(
+      api("/api/list", { path: folder })
+    );
 
-    const r =
-      await fetch(
-        "/api/list?path=" +
-        encodeURIComponent(p)
-      );
+    const data = await res.json();
 
-    const data =
-      await r.json();
-
-    if (!data.status) {
-      throw new Error(
-        data.error ||
-        "Failed"
-      );
+    if (!data.ok) {
+      throw new Error(data.error || "Unable to load");
     }
 
-    currentPath = p;
-
-    $("currentPath")
-      .textContent =
-      "/" + p;
-
-    $("backBtn")
-      .disabled = !p;
-
-    statusEl.textContent =
-      data.total +
-      " item" +
-      (
-        data.total === 1
-          ? ""
-          : "s"
-      );
-
-    render(
-      data.items
-    );
-
+    render(data.items);
+    updateBreadcrumb();
   } catch (e) {
-
-    statusEl.textContent =
-      e.message;
-
-  }
-
-}
-
-
-// =========================================================
-// RENDER
-// =========================================================
-
-function render(items) {
-
-  grid.innerHTML = "";
-
-  if (!items.length) {
-
-    grid.innerHTML = `
-      <div class="file-empty">
-        <div class="file-empty-icon">📂</div>
-        <strong>This folder is empty</strong>
-        <span>No files or folders found.</span>
+    content.innerHTML = `
+      <div class="error-box">
+        <div>⚠️</div>
+        <b>Unable to load folder</b>
+        <small>${escapeHtml(e.message)}</small>
       </div>
     `;
+  }
+}
 
+function render(items) {
+  if (!items.length) {
+    content.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">📂</div>
+        <b>This folder is empty</b>
+        <small>No files or folders found</small>
+      </div>
+    `;
     return;
   }
 
+  const folders = items.filter(x => x.type === "folder");
+  const files = items.filter(x => x.type !== "folder");
 
-  // Folders first
-  const folders = items.filter(
-    item => item.type === "folder"
-  );
-
-  const files = items.filter(
-    item => item.type !== "folder"
-  );
-
-
-  // =======================================================
-  // FOLDERS
-  // =======================================================
+  let html = "";
 
   if (folders.length) {
-
-    const folderTitle =
-      document.createElement("div");
-
-    folderTitle.className =
-      "file-section-title";
-
-    folderTitle.innerHTML = `
-      <span>Folders</span>
-      <small>${folders.length}</small>
-    `;
-
-    grid.appendChild(folderTitle);
-
-
-    const folderGrid =
-      document.createElement("div");
-
-    folderGrid.className =
-      "folder-grid";
-
+    html += `<section>
+      <div class="section-title">Folders <span>${folders.length}</span></div>
+      <div class="folder-grid">`;
 
     for (const item of folders) {
-
-      const card =
-        document.createElement("article");
-
-      card.className =
-        "folder-card";
-
-
-      card.innerHTML = `
-        <div class="folder-icon-wrap">
-          <div class="folder-back"></div>
-          <div class="folder-front">
-            <span>📂</span>
-          </div>
-        </div>
-
-        <div class="folder-info">
-
-          <strong>
-            ${escapeHtml(item.name)}
-          </strong>
-
-          <small>
-            Folder
-          </small>
-
-        </div>
-
-        <div class="folder-arrow">
-          ›
-        </div>
+      html += `
+        <button class="folder-card"
+          data-folder="${escapeHtml(item.path)}">
+          <div class="folder-icon">📂</div>
+          <div class="folder-name">${escapeHtml(item.name)}</div>
+          <div class="folder-arrow">›</div>
+        </button>
       `;
-
-
-      card.onclick =
-        () => loadFolder(item.path);
-
-
-      folderGrid.appendChild(card);
-
     }
 
-
-    grid.appendChild(folderGrid);
-
+    html += `</div></section>`;
   }
-
-
-  // =======================================================
-  // FILES
-  // =======================================================
 
   if (files.length) {
+    html += `
+      <section>
+        <div class="section-title">
+          Files <span>${files.length}</span>
+        </div>
 
-    const fileTitle =
-      document.createElement("div");
-
-    fileTitle.className =
-      "file-section-title files-title";
-
-    fileTitle.innerHTML = `
-      <span>Files</span>
-      <small>${files.length}</small>
+        <div class="file-list">
     `;
 
-    grid.appendChild(fileTitle);
-
-
-    const fileList =
-      document.createElement("div");
-
-    fileList.className =
-      "file-list";
-
-
     for (const item of files) {
+      const thumb =
+        item.type === "image"
+          ? `<img src="${fileUrl(item.path)}" loading="lazy">`
+          : item.type === "video"
+            ? `<div class="video-thumb">▶</div>`
+            : `<div class="file-thumb">📄</div>`;
 
-      const card =
-        document.createElement("article");
+      html += `
+        <button class="file-card"
+          data-path="${escapeHtml(item.path)}"
+          data-type="${item.type}">
 
-      card.className =
-        "file-card";
-
-
-      const url =
-        fileUrl(item);
-
-
-      let preview = "";
-
-
-      if (item.type === "image") {
-
-        preview = `
-          <div class="file-thumb image-thumb">
-            <img
-              src="${url}"
-              loading="lazy"
-              alt=""
-            >
+          <div class="thumb">
+            ${thumb}
           </div>
-        `;
 
-      } else if (item.type === "video") {
+          <div class="file-info">
+            <div class="file-name">
+              ${escapeHtml(item.name)}
+            </div>
 
-        preview = `
-          <div class="file-thumb video-thumb">
-            <video
-              src="${url}"
-              preload="metadata"
-            ></video>
-
-            <span class="video-play">
-              ▶
-            </span>
+            <div class="file-meta">
+              ${formatSize(item.size)}
+              ${item.modified ? " • " + formatDate(item.modified) : ""}
+            </div>
           </div>
-        `;
 
-      } else {
-
-        preview = `
-          <div class="file-thumb generic-file">
-            📄
-          </div>
-        `;
-
-      }
-
-
-      card.innerHTML = `
-
-        ${preview}
-
-        <div class="file-info">
-
-          <strong>
-            ${escapeHtml(item.name)}
-          </strong>
-
-          <span>
-            ${formatSize(item.size)}
-            ${item.modified
-              ? " • " + formatDate(item.modified)
-              : ""}
-          </span>
-
-        </div>
-
-        <div class="file-type">
-          ${
-            item.type === "image"
-              ? "IMG"
-              : item.type === "video"
-                ? "VIDEO"
-                : "FILE"
-          }
-        </div>
-
-        <div class="file-arrow">
-          ›
-        </div>
-
+          <div class="file-arrow">›</div>
+        </button>
       `;
-
-
-      if (
-        item.type === "image" ||
-        item.type === "video"
-      ) {
-
-        card.onclick =
-          () => openViewer(item);
-
-      }
-
-
-      fileList.appendChild(card);
-
     }
 
-
-    grid.appendChild(fileList);
-
+    html += `
+        </div>
+      </section>
+    `;
   }
 
+  content.innerHTML = html;
+
+  document.querySelectorAll(".folder-card")
+    .forEach(card => {
+      card.addEventListener("click", () => {
+        pathStack.push(currentPath);
+        loadFolder(card.dataset.folder);
+      });
+    });
+
+  document.querySelectorAll(".file-card")
+    .forEach(card => {
+      card.addEventListener("click", () => {
+        openViewer(
+          card.dataset.path,
+          card.dataset.type
+        );
+      });
+    });
 }
 
-// =========================================================
-// VIEWER
-// =========================================================
-
-function openViewer(item) {
-
-  viewerContent.innerHTML = "";
-
-  const url =
-    fileUrl(item);
-
-
-  if (
-    item.type ===
-    "image"
-  ) {
-
-    const img =
-      document.createElement(
-        "img"
-      );
-
-    img.src = url;
-
-    img.alt =
-      item.name;
-
-    viewerContent
-      .appendChild(img);
-
-  } else {
-
-    const video =
-      document.createElement(
-        "video"
-      );
-
-    video.src = url;
-
-    video.controls =
-      true;
-
-    video.autoplay =
-      true;
-
-    video.playsInline =
-      true;
-
-    viewerContent
-      .appendChild(video);
-
-  }
-
-
-  viewerName.textContent =
-    item.name;
-
-  downloadBtn.href =
-    "/api/download?path=" +
-    encodeURIComponent(
-      item.path
-    );
-
-  downloadBtn.download =
-    item.name;
-
-  viewer.hidden =
-    false;
-
-  document.body
-    .classList
-    .add("viewer-open");
-
-  recordHistory(
-    "view",
-    item
-  );
-
-}
-
-
-function closeViewer() {
-
-  const video =
-    viewerContent
-      .querySelector(
-        "video"
-      );
-
-  if (video) {
-
-    video.pause();
-
-    video.removeAttribute(
-      "src"
-    );
-
-  }
-
-  viewerContent.innerHTML =
-    "";
-
-  viewer.hidden =
-    true;
-
-  document.body
-    .classList
-    .remove(
-      "viewer-open"
-    );
-
-}
-
-
-$("closeViewer")
-  .onclick =
-    closeViewer;
-
-
-viewer.onclick =
-  e => {
-
-    if (
-      e.target ===
-      viewer
-    ) {
-
-      closeViewer();
-
-    }
-
-  };
-
-
-document.addEventListener(
-  "keydown",
-  e => {
-
-    if (
-      e.key === "Escape" &&
-      !viewer.hidden
-    ) {
-
-      closeViewer();
-
-    }
-
-  }
-);
-
-
-// =========================================================
-// DOWNLOAD HISTORY
-// =========================================================
-
-downloadBtn.onclick =
-  () => {
-
-    recordHistory(
-      "download",
-      {
-        path:
-          new URL(
-            downloadBtn.href,
-            location.href
-          )
-          .searchParams
-          .get("path"),
-
-        name:
-          viewerName
-            .textContent,
-
-        type:
-          viewerContent
-            .querySelector(
-              "video"
-            )
-            ? "video"
-            : "image"
-      }
-    );
-
-  };
-
-
-// =========================================================
-// HISTORY PASSWORD
-// =========================================================
-
-let historyPassword =
-  sessionStorage.getItem(
-    "rakibHistoryPassword"
-  ) || "";
-
-
-function historyApi(
-  url
-) {
-
-  const join =
-    url.includes("?")
-      ? "&"
-      : "?";
-
-  return (
-    url +
-    join +
-    "historyPassword=" +
-    encodeURIComponent(
-      historyPassword
-    )
-  );
-
-}
-
-
-async function askHistoryPassword() {
-
-  if (historyPassword) {
-
-    const test =
-      await fetch(
-        historyApi(
-          "/api/history?deviceId=" +
-          encodeURIComponent(
-            deviceId
-          )
-        )
-      );
-
-    if (test.ok) {
-      return true;
-    }
-
-  }
-
-
-  const pass =
-    prompt(
-      "Enter History Password"
-    );
-
-  if (!pass)
-    return false;
-
-  historyPassword =
-    pass;
-
-  const r =
-    await fetch(
-      historyApi(
-        "/api/history?deviceId=" +
-        encodeURIComponent(
-          deviceId
-        )
-      )
-    );
-
-  if (!r.ok) {
-
-    historyPassword =
-      "";
-
-    alert(
-      "Wrong history password."
-    );
-
-    return false;
-
-  }
-
-  sessionStorage.setItem(
-    "rakibHistoryPassword",
-    historyPassword
-  );
-
-  return true;
-
-}
-
-
-// =========================================================
-// HISTORY PAGE
-// =========================================================
-
-async function showHistory() {
-
-  const ok =
-    await askHistoryPassword();
-
-  if (!ok)
-    return;
-
-  grid.hidden =
-    true;
-
-  historyPanel.hidden =
-    false;
-
-  document
-    .querySelectorAll(
-      ".nav-item"
-    )
-    .forEach(
-      x =>
-        x.classList
-          .remove("active")
-    );
-
-  document
-    .querySelector(
-      '[data-page="historyPage"]'
-    )
-    ?.classList
-    .add("active");
-
-  await loadHistory();
-
-}
-
-
-async function loadHistory() {
-
-  historyList.innerHTML = `
-    <div class="history-loading">
-      Loading your private history…
-    </div>
+function updateBreadcrumb() {
+  const parts = currentPath
+    ? currentPath.split("/").filter(Boolean)
+    : [];
+
+  let html = `
+    <button class="crumb" data-path="">📂 Home</button>
   `;
 
+  let built = "";
 
-  try {
+  parts.forEach((part, index) => {
+    built += (built ? "/" : "") + part;
 
-    const r =
-      await fetch(
-        historyApi(
-          "/api/history?deviceId=" +
-          encodeURIComponent(
-            deviceId
-          )
-        )
-      );
+    html += `
+      <span class="crumb-sep">›</span>
+      <button class="crumb" data-path="${escapeHtml(built)}">
+        ${escapeHtml(part)}
+      </button>
+    `;
+  });
 
-    const data =
-      await r.json();
+  breadcrumb.innerHTML = html;
 
-    if (!r.ok || !data.status) {
+  breadcrumb.querySelectorAll(".crumb")
+    .forEach(btn => {
+      btn.addEventListener("click", () => {
+        pathStack = [];
+        loadFolder(btn.dataset.path);
+      });
+    });
 
-      historyPassword = "";
+  backBtn.disabled = !currentPath && pathStack.length === 0;
+}
 
-      sessionStorage.removeItem(
-        "rakibHistoryPassword"
-      );
-
-      historyList.innerHTML =
-        `<div class="error">
-          ${escapeHtml(
-            data.error ||
-            "Unable to load history"
-          )}
-        </div>`;
-
-      return;
-
-    }
-
-
-    if (
-      !data.items.length
-    ) {
-
-      historyList.innerHTML = `
-        <div class="history-empty">
-          <div class="history-empty-icon">
-            ◷
-          </div>
-
-          <strong>
-            No activity yet
-          </strong>
-
-          <span>
-            Photos and downloads
-            from this device
-            will appear here.
-          </span>
-        </div>
-      `;
-
-      return;
-
-    }
-
-
-    historyList.innerHTML =
-      data.items
-        .map(
-          item => {
-
-            const url =
-              fileUrl(item);
-
-            return `
-              <article
-                class="history-card"
-                data-path="${escapeHtml(
-                  item.path
-                )}"
-              >
-
-                <div
-                  class="history-card-thumb"
-                >
-
-                  ${
-                    item.type ===
-                    "image"
-
-                    ? `
-                      <img
-                        src="${url}"
-                        loading="lazy"
-                      >
-                    `
-
-                    : `
-                      <div
-                        class="history-video"
-                      >
-                        ▶
-                      </div>
-                    `
-                  }
-
-                </div>
-
-                <div
-                  class="history-card-main"
-                >
-
-                  <strong>
-                    ${escapeHtml(
-                      item.name
-                    )}
-                  </strong>
-
-                  <span>
-                    ${
-                      item.action ===
-                      "download"
-                        ? "↓ Downloaded"
-                        : "◉ Viewed"
-                    }
-                  </span>
-
-                  <small>
-                    ${formatDate(
-                      item.time
-                    )}
-                  </small>
-
-                </div>
-
-                <div
-                  class="history-card-arrow"
-                >
-                  ›
-                </div>
-
-              </article>
-            `;
-
-          }
-        )
-        .join("");
-
-
-    historyList
-      .querySelectorAll(
-        ".history-card"
-      )
-      .forEach(
-        el => {
-
-          el.onclick =
-            () => {
-
-              const item =
-                data.items.find(
-                  x =>
-                    x.path ===
-                    el.dataset.path
-                );
-
-              if (item) {
-
-                showGallery();
-
-                openViewer(
-                  item
-                );
-
-              }
-
-            };
-
-        }
-      );
-
-
-  } catch (e) {
-
-    historyList.innerHTML =
-      `<div class="error">
-        ${escapeHtml(
-          e.message
-        )}
-      </div>`;
-
+function goBack() {
+  if (pathStack.length) {
+    const previous = pathStack.pop();
+    loadFolder(previous);
+    return;
   }
 
+  if (currentPath) {
+    const parts = currentPath.split("/").filter(Boolean);
+    parts.pop();
+
+    loadFolder(parts.join("/"));
+  }
 }
 
+function openViewer(path, type) {
+  viewerName.textContent = path.split("/").pop();
+  downloadBtn.href = downloadUrl(path);
 
-// =========================================================
-// CLEAR HISTORY
-// =========================================================
+  if (type === "image") {
+    viewerBody.innerHTML = `
+      <img
+        class="preview-image"
+        src="${fileUrl(path)}"
+        alt=""
+      >
+    `;
+  } else if (type === "video") {
+    viewerBody.innerHTML = `
+      <video
+        class="preview-video"
+        src="${fileUrl(path)}"
+        controls
+        autoplay
+      ></video>
+    `;
+  } else {
+    viewerBody.innerHTML = `
+      <div class="file-preview">
+        <div>📄</div>
+        <b>${escapeHtml(path.split("/").pop())}</b>
+        <a href="${downloadUrl(path)}">Download file</a>
+      </div>
+    `;
+  }
 
-$("clearHistory")
-  .onclick =
-  async () => {
+  viewer.classList.remove("hidden");
+  document.body.classList.add("viewer-open");
 
-    if (
-      !confirm(
-        "Clear history for this device?"
-      )
-    ) return;
+  recordHistory(path, "view");
+}
 
-    await fetch(
-      historyApi(
-        "/api/history?deviceId=" +
-        encodeURIComponent(
-          deviceId
-        )
-      ),
-      {
-        method:
-          "DELETE"
-      }
+function closePreview() {
+  viewer.classList.add("hidden");
+  document.body.classList.remove("viewer-open");
+  viewerBody.innerHTML = "";
+}
+
+closeViewer.addEventListener("click", closePreview);
+
+viewer.addEventListener("click", e => {
+  if (e.target === viewer) closePreview();
+});
+
+downloadBtn.addEventListener("click", () => {
+  const url = new URL(downloadBtn.href);
+  recordHistory(
+    url.searchParams.get("path") || "",
+    "download"
+  );
+});
+
+backBtn.addEventListener("click", goBack);
+
+refreshBtn.addEventListener("click", () => {
+  loadFolder(currentPath);
+});
+
+search.addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+
+  const q = search.value.trim();
+
+  if (!q) {
+    loadFolder(currentPath);
+    return;
+  }
+
+  performSearch(q);
+});
+
+async function performSearch(q) {
+  content.innerHTML =
+    `<div class="loading">Searching...</div>`;
+
+  try {
+    const res = await fetch(
+      api("/api/search", { q })
     );
+
+    const data = await res.json();
+
+    if (!data.ok) throw new Error(data.error);
+
+    renderSearch(data.items);
+  } catch (e) {
+    content.innerHTML = `
+      <div class="error-box">
+        ⚠️ ${escapeHtml(e.message)}
+      </div>
+    `;
+  }
+}
+
+function renderSearch(items) {
+  if (!items.length) {
+    content.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">🔎</div>
+        <b>No results</b>
+      </div>
+    `;
+    return;
+  }
+
+  const html = `
+    <section>
+      <div class="section-title">
+        Search Results <span>${items.length}</span>
+      </div>
+
+      <div class="file-list">
+        ${items.map(item => `
+          <button class="file-card"
+            data-path="${escapeHtml(item.path)}"
+            data-type="${item.type}">
+
+            <div class="thumb">
+              ${
+                item.type === "image"
+                ? `<img src="${fileUrl(item.path)}">`
+                : item.type === "video"
+                  ? `<div class="video-thumb">▶</div>`
+                  : `<div class="file-thumb">📄</div>`
+              }
+            </div>
+
+            <div class="file-info">
+              <div class="file-name">
+                ${escapeHtml(item.name)}
+              </div>
+
+              <div class="file-meta">
+                📁 ${escapeHtml(item.path)}
+              </div>
+            </div>
+
+            <div class="file-arrow">›</div>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+
+  content.innerHTML = html;
+
+  document.querySelectorAll(".file-card")
+    .forEach(card => {
+      card.addEventListener("click", () => {
+        openViewer(
+          card.dataset.path,
+          card.dataset.type
+        );
+      });
+    });
+}
+
+/* =========================
+   HISTORY
+========================= */
+
+historyBtn.addEventListener("click", () => {
+  historyModal.classList.remove("hidden");
+
+  if (historyUnlocked) {
+    loadHistory();
+  }
+});
+
+closeHistory.addEventListener("click", () => {
+  historyModal.classList.add("hidden");
+});
+
+historyModal.addEventListener("click", e => {
+  if (e.target === historyModal) {
+    historyModal.classList.add("hidden");
+  }
+});
+
+historyLoginBtn.addEventListener("click", async () => {
+  const pass = historyPassword.value;
+
+  if (!pass) return;
+
+  historyError.textContent = "Checking...";
+
+  try {
+    const res = await fetch(
+      api("/api/history", {
+        deviceId: deviceId(),
+        password: pass
+      })
+    );
+
+    if (!res.ok) {
+      historyError.textContent =
+        "❌ Wrong history password";
+      return;
+    }
+
+    historyPass = pass;
+    historyUnlocked = true;
+
+    historyLogin.classList.add("hidden");
+    historyContent.classList.remove("hidden");
 
     loadHistory();
+  } catch {
+    historyError.textContent =
+      "❌ Connection error";
+  }
+});
 
-  };
+async function loadHistory() {
+  historyList.innerHTML =
+    `<div class="loading">Loading history...</div>`;
 
-
-// =========================================================
-// NAVIGATION
-// =========================================================
-
-function showGallery() {
-
-  historyPanel.hidden =
-    true;
-
-  grid.hidden =
-    false;
-
-  document
-    .querySelectorAll(
-      ".nav-item"
-    )
-    .forEach(
-      x =>
-        x.classList
-          .remove("active")
+  try {
+    const res = await fetch(
+      api("/api/history", {
+        deviceId: deviceId(),
+        password: historyPass
+      })
     );
 
-  document
-    .querySelector(
-      '[data-page="galleryPage"]'
-    )
-    ?.classList
-    .add("active");
+    const data = await res.json();
 
+    if (!data.ok) throw new Error(data.error);
+
+    if (!data.items.length) {
+      historyList.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">🕘</div>
+          <b>No history yet</b>
+        </div>
+      `;
+      return;
+    }
+
+    historyList.innerHTML = data.items.map(item => `
+      <button class="history-item"
+        data-path="${escapeHtml(item.path)}">
+
+        <div class="history-icon">
+          ${item.action === "download" ? "⬇️" : "👁️"}
+        </div>
+
+        <div class="history-info">
+          <b>${escapeHtml(item.name)}</b>
+          <small>${escapeHtml(item.path)}</small>
+          <small>${formatDate(item.time)}</small>
+        </div>
+
+        <span>›</span>
+      </button>
+    `).join("");
+
+    document.querySelectorAll(".history-item")
+      .forEach(item => {
+        item.addEventListener("click", () => {
+          const p = item.dataset.path;
+          const ext = p.split(".").pop().toLowerCase();
+
+          const type =
+            ["jpg","jpeg","png","gif","webp","bmp","heic","heif","avif"].includes(ext)
+              ? "image"
+              : ["mp4","mkv","webm","mov","avi","m4v","3gp"].includes(ext)
+                ? "video"
+                : "file";
+
+          historyModal.classList.add("hidden");
+          openViewer(p, type);
+        });
+      });
+
+  } catch (e) {
+    historyList.innerHTML = `
+      <div class="error-box">
+        ${escapeHtml(e.message)}
+      </div>
+    `;
+  }
 }
 
+clearHistory.addEventListener("click", async () => {
+  if (!confirm("Clear this device's history?")) return;
 
-document
-  .querySelectorAll(
-    ".nav-item"
-  )
-  .forEach(
-    btn => {
-
-      btn.onclick =
-        () => {
-
-          if (
-            btn.dataset.page ===
-            "historyPage"
-          ) {
-
-            showHistory();
-
-          } else {
-
-            loadFolder(
-              currentPath
-            );
-
-          }
-
-        };
-
+  await fetch(
+    api("/api/history", {
+      deviceId: deviceId()
+    }),
+    {
+      method: "DELETE",
+      headers: {
+        "x-history-password": historyPass
+      }
     }
   );
 
-
-// =========================================================
-// SEARCH
-// =========================================================
-
-let searchTimer;
-
-$("search")
-  .addEventListener(
-    "input",
-    () => {
-
-      clearTimeout(
-        searchTimer
-      );
-
-      const q =
-        $("search")
-          .value
-          .trim();
-
-      searchTimer =
-        setTimeout(
-          async () => {
-
-            if (!q) {
-
-              loadFolder(
-                currentPath
-              );
-
-              return;
-
-            }
-
-            statusEl.textContent =
-              "Searching…";
-
-            try {
-
-              const r =
-                await fetch(
-                  "/api/search?q=" +
-                  encodeURIComponent(
-                    q
-                  )
-                );
-
-              const data =
-                await r.json();
-
-              if (!data.status) {
-                throw new Error(
-                  data.error
-                );
-              }
-
-              statusEl.textContent =
-                data.total +
-                " result" +
-                (
-                  data.total === 1
-                    ? ""
-                    : "s"
-                );
-
-              render(
-                data.items
-              );
-
-            } catch (e) {
-
-              statusEl.textContent =
-                e.message;
-
-            }
-
-          },
-          300
-        );
-
-    }
-  );
-
-
-// =========================================================
-// BACK / HOME
-// =========================================================
-
-$("backBtn")
-  .onclick =
-  () => {
-
-    if (!currentPath)
-      return;
-
-    const parent =
-      currentPath
-        .split("/")
-        .slice(0, -1)
-        .join("/");
-
-    loadFolder(
-      parent
-    );
-
-  };
-
-
-$("homeBtn")
-  .onclick =
-    () =>
-      loadFolder("");
-
+  loadHistory();
+});
 
 loadFolder("");
