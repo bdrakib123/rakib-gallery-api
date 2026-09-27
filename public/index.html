@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,viewport-fit=cover"
+>
+
+<meta
+  name="theme-color"
+  content="#050507"
+>
+
+<meta
+  name="robots"
+  content="noindex,nofollow"
+>
+
+<title>Rakib Gallery</title>
+
+<link
+  rel="stylesheet"
+  href="/style.css?v=folder-ui-20260927"
+>
+
+</head>
+
+<body>
+
+<div class="app-shell">
+
+<!-- =====================================================
+     GALLERY HEADER
+===================================================== -->
+
+<header class="topbar">
+
+  <div class="brand">
+
+    <div class="brand-icon">
+      RG
+    </div>
+
+    <div class="brand-text">
+
+      <strong>
+        Rakib Gallery
+      </strong>
+
+      <span id="currentPath">
+        /
+      </span>
+
+    </div>
+
+  </div>
+
+  <div class="online-dot">
+    <i></i>
+    Private device
+  </div>
+
+</header>
+
+
+<!-- =====================================================
+     GALLERY
+===================================================== -->
+
+<main id="gallery">
+
+<section class="hero">
+
+  <div>
+
+    <span class="eyebrow">
+      PERSONAL LIBRARY
+    </span>
+
+    <h1>
+      My Gallery
+    </h1>
+
+    <p id="status">
+      Loading…
+    </p>
+
+  </div>
+
+  <div class="hero-art">
+    ◈
+  </div>
+
+</section>
+
+
+<div class="toolbar">
+
+  <button
+    id="backBtn"
+    class="tool-btn"
+    aria-label="Back"
+  >
+    ←
+  </button>
+
+  <div class="search-box">
+
+    <span>⌕</span>
+
+    <input
+      id="search"
+      placeholder="Search photos & videos"
+      autocomplete="off"
+    >
+
+  </div>
+
+  <button
+    id="homeBtn"
+    class="tool-btn"
+    aria-label="Home"
+  >
+    ⌂
+  </button>
+
+</div>
+
+
+<div
+  id="grid"
+  class="grid"
+></div>
+
+
+<!-- =====================================================
+     HISTORY VAULT
+===================================================== -->
+
+<section
+  id="historyPanel"
+  class="history-vault"
+  hidden
+>
+
+  <div class="vault-cover">
+
+    <div class="vault-lock">
+      ◉
+    </div>
+
+    <div class="vault-title">
+
+      <span>
+        PRIVATE VAULT
+      </span>
+
+      <h2>
+        Activity History
+      </h2>
+
+      <p>
+        This device only
+      </p>
+
+    </div>
+
+    <button
+      id="clearHistory"
+      class="vault-clear"
+    >
+      Clear
+    </button>
+
+  </div>
+
+
+  <div class="vault-security">
+
+    <div class="security-icon">
+      ✓
+    </div>
+
+    <div>
+
+      <strong>
+        Protected History
+      </strong>
+
+      <span>
+        Your gallery activity is locked
+        behind a separate password.
+      </span>
+
+    </div>
+
+  </div>
+
+
+  <div
+    id="historyList"
+    class="vault-list"
+  ></div>
+
+</section>
+
+</main>
+
+
+<!-- =====================================================
+     BOTTOM NAV
+===================================================== -->
+
+<nav
+  id="bottomNav"
+  class="bottom-nav"
+>
+
+  <button
+    class="nav-item active"
+    data-page="galleryPage"
+  >
+
+    <span>▦</span>
+
+    <small>
+      Gallery
+    </small>
+
+  </button>
+
+
+  <button
+    class="nav-item"
+    data-page="historyPage"
+  >
+
+    <span>◷</span>
+
+    <small>
+      History
+    </small>
+
+  </button>
+
+</nav>
+
+
+<!-- =====================================================
+     VIEWER
+===================================================== -->
+
+<div
+  id="viewer"
+  class="viewer"
+  hidden
+>
+
+  <button
+    id="closeViewer"
+    class="viewer-close"
+  >
+    ×
+  </button>
+
+  <div
+    id="viewerContent"
+    class="viewer-content"
+  ></div>
+
+  <div class="viewer-bottom">
+
+    <div
+      id="viewerName"
+      class="viewer-name"
+    ></div>
+
+    <a
+      id="downloadBtn"
+      class="download-btn"
+    >
+      ↓ Download
+    </a>
+
+  </div>
+
+</div>
+
+</div>
+
+
+<script
+  src="/app.js?v=folder-ui-20260927"
+></script>
+
+</body>
+</html>

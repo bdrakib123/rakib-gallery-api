@@ -1,0 +1,13 @@
+{
+  "name": "rakib-gallery-api",
+  "version": "1.0.0",
+  "description": "Private Android gallery API and web viewer for Termux",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
