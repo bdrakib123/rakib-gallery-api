@@ -1000,6 +1000,12 @@ function encodeFilePath(path) {
 async function uploadPwaFile(file, relativePath, rootName) {
   const remotePath = `${rootName}/${relativePath}`.replace(/\\/g, "/");
 
+  console.log("[PWA UPLOAD] starting:", {
+    name: file.name,
+    size: file.size,
+    remotePath
+  });
+
   const response = await fetch("/api/sync/file", {
     method: "PUT",
     credentials: "same-origin",
@@ -1009,16 +1015,26 @@ async function uploadPwaFile(file, relativePath, rootName) {
     body: file
   });
 
+  const text = await response.text();
+
+  console.log("[PWA UPLOAD] response:", {
+    status: response.status,
+    ok: response.ok,
+    body: text
+  });
+
   if (!response.ok) {
     let message = `HTTP ${response.status}`;
 
     try {
-      const data = await response.json();
+      const data = JSON.parse(text);
       if (data?.error) message = data.error;
     } catch (_) {}
 
     throw new Error(message);
   }
+
+  return true;
 }
 
 async function chooseGalleryDirectory() {
@@ -1066,28 +1082,78 @@ async function chooseGalleryDirectory() {
     }
 
     const files = [];
+    let scanned = 0;
+    let supported = 0;
+
+    // Folders that should never be scanned.
+    const SKIP_DIRECTORIES = new Set([
+      ".thumbnails",
+      ".thumbnail",
+      ".cache",
+      "Android",
+      "data",
+      "obb",
+      "node_modules",
+      "__pycache__"
+    ]);
 
     async function collectFiles(directory, relative = "") {
       for await (const entry of directory.values()) {
-        if (entry.kind === "file") {
-          const file = await entry.getFile();
+        scanned++;
 
-          const relativePath = relative
-            ? `${relative}/${entry.name}`
-            : entry.name;
-
-          if (isAllowedPwaFile(entry.name)) {
-            files.push({
-              file,
-              relativePath
-            });
+        // Give Android Chrome a chance to update the UI.
+        if (scanned % 25 === 0) {
+          if (galleryConnectStatus) {
+            galleryConnectStatus.textContent =
+              `Scanning "${handle.name}"... ${scanned} items checked, ${supported} supported`;
           }
-        } else if (entry.kind === "directory") {
+
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        if (entry.kind === "directory") {
+          if (SKIP_DIRECTORIES.has(entry.name)) {
+            continue;
+          }
+
           const nextRelative = relative
             ? `${relative}/${entry.name}`
             : entry.name;
 
           await collectFiles(entry, nextRelative);
+          continue;
+        }
+
+        if (entry.kind !== "file") {
+          continue;
+        }
+
+        // IMPORTANT:
+        // Check extension BEFORE getFile().
+        // This avoids unnecessarily reading unsupported files.
+        if (!isAllowedPwaFile(entry.name)) {
+          continue;
+        }
+
+        const relativePath = relative
+          ? `${relative}/${entry.name}`
+          : entry.name;
+
+        try {
+          const file = await entry.getFile();
+
+          files.push({
+            file,
+            relativePath
+          });
+
+          supported++;
+        } catch (error) {
+          console.warn(
+            "Could not read file:",
+            relativePath,
+            error
+          );
         }
       }
     }
@@ -1095,12 +1161,14 @@ async function chooseGalleryDirectory() {
     await collectFiles(handle);
 
     if (!files.length) {
-      throw new Error("No supported media/document files found");
+      throw new Error(
+        `No supported media/document files found. ${scanned} items were scanned.`
+      );
     }
 
     if (galleryConnectStatus) {
       galleryConnectStatus.textContent =
-        `Found ${files.length} supported files. Uploading to Render...`;
+        `Found ${files.length} supported files. Starting upload...`;
     }
 
     let uploaded = 0;
@@ -1120,6 +1188,12 @@ async function chooseGalleryDirectory() {
           galleryConnectStatus.textContent =
             `Uploading ${uploaded}/${files.length}...`;
         }
+
+        // Keep the UI responsive.
+        if (uploaded % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
       } catch (error) {
         failed++;
 
@@ -1139,7 +1213,7 @@ async function chooseGalleryDirectory() {
           `✓ Sync complete. ${uploaded} file(s) uploaded successfully.`;
       } else {
         galleryConnectResult.textContent =
-          `✓ ${uploaded} uploaded, ${failed} failed. Check browser console for failed files.`;
+          `✓ ${uploaded} uploaded, ${failed} failed.`;
       }
     }
 
@@ -1148,7 +1222,6 @@ async function chooseGalleryDirectory() {
         `Finished syncing "${handle.name}".`;
     }
 
-    // Refresh current gallery
     if (typeof loadFolder === "function") {
       try {
         await loadFolder(currentPath || "");
@@ -1170,6 +1243,7 @@ async function chooseGalleryDirectory() {
       galleryConnectStatus.textContent =
         "Could not connect/sync the selected folder.";
     }
+
   } finally {
     if (chooseGalleryFolder) {
       chooseGalleryFolder.disabled = false;
