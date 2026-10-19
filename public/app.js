@@ -1,4 +1,39 @@
 
+/* TEMP DEBUG */
+window.__RAKIB_JS_ERROR_HANDLER__ = true;
+
+window.addEventListener("error", event => {
+  console.error("RAKIB JS ERROR:", event.error || event.message);
+
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:10px;right:10px;bottom:10px;z-index:999999;" +
+    "padding:14px;background:#35151b;color:#fff;border:1px solid #ff6677;" +
+    "border-radius:12px;font:13px monospace;white-space:pre-wrap;";
+  box.textContent =
+    "⚠️ JavaScript Error\\n" +
+    (event.error?.stack || event.message || "Unknown error");
+
+  document.body.appendChild(box);
+});
+
+window.addEventListener("unhandledrejection", event => {
+  console.error("RAKIB PROMISE ERROR:", event.reason);
+
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;left:10px;right:10px;bottom:10px;z-index:999999;" +
+    "padding:14px;background:#35151b;color:#fff;border:1px solid #ff6677;" +
+    "border-radius:12px;font:13px monospace;white-space:pre-wrap;";
+  box.textContent =
+    "⚠️ Promise Error\\n" +
+    (event.reason?.stack || event.reason || "Unknown error");
+
+  document.body.appendChild(box);
+});
+
+/* END TEMP DEBUG */
+
 /*
  * Device identity is now handled automatically
  * by the server using an HttpOnly cookie.
