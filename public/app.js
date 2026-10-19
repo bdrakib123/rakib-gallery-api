@@ -920,6 +920,72 @@ if (galleryConnectModal) {
   });
 }
 
+const PWA_ALLOWED_EXTENSIONS = new Set([
+  ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp",
+  ".heic", ".heif", ".avif", ".tif", ".tiff",
+  ".mp4", ".mkv", ".webm", ".mov", ".avi", ".m4v", ".3gp", ".ts",
+  ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".opus",
+  ".pdf", ".txt", ".doc", ".docx", ".xls", ".xlsx",
+  ".ppt", ".pptx", ".zip", ".rar", ".7z"
+]);
+
+function isAllowedPwaFile(name) {
+  const lower = String(name || "").toLowerCase();
+
+  if (
+    lower.endsWith(".apk") ||
+    lower.endsWith(".apks") ||
+    lower.endsWith(".xapk") ||
+    lower.endsWith(".aab") ||
+    lower.endsWith(".exe") ||
+    lower.endsWith(".msi") ||
+    lower.endsWith(".bat") ||
+    lower.endsWith(".sh") ||
+    lower.endsWith(".db") ||
+    lower.endsWith(".sqlite") ||
+    lower.endsWith(".sqlite3") ||
+    lower.endsWith(".log") ||
+    lower.endsWith(".tmp") ||
+    lower.endsWith(".cache") ||
+    lower.endsWith(".bak") ||
+    lower.endsWith(".bin") ||
+    lower.endsWith(".nomedia")
+  ) {
+    return false;
+  }
+
+  const dot = lower.lastIndexOf(".");
+  return dot >= 0 && PWA_ALLOWED_EXTENSIONS.has(lower.slice(dot));
+}
+
+function encodeFilePath(path) {
+  return encodeURIComponent(path);
+}
+
+async function uploadPwaFile(file, relativePath, rootName) {
+  const remotePath = `${rootName}/${relativePath}`.replace(/\\/g, "/");
+
+  const response = await fetch("/api/sync/file", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      "x-file-path": encodeFilePath(remotePath)
+    },
+    body: file
+  });
+
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch (_) {}
+
+    throw new Error(message);
+  }
+}
+
 async function chooseGalleryDirectory() {
   if (!window.showDirectoryPicker) {
     if (galleryConnectResult) {
@@ -947,44 +1013,132 @@ async function chooseGalleryDirectory() {
       }
     }
 
-    if (permission !== "granted" && typeof handle.queryPermission === "function") {
+    if (
+      permission !== "granted" &&
+      typeof handle.queryPermission === "function"
+    ) {
       throw new Error("Folder permission was not granted");
     }
 
-    let count = 0;
+    if (galleryConnectStatus) {
+      galleryConnectStatus.textContent =
+        `Scanning "${handle.name}"...`;
+    }
 
-    async function countFiles(directory) {
+    if (chooseGalleryFolder) {
+      chooseGalleryFolder.disabled = true;
+      chooseGalleryFolder.textContent = "⏳ Scanning...";
+    }
+
+    const files = [];
+
+    async function collectFiles(directory, relative = "") {
       for await (const entry of directory.values()) {
         if (entry.kind === "file") {
-          count++;
+          const file = await entry.getFile();
+
+          const relativePath = relative
+            ? `${relative}/${entry.name}`
+            : entry.name;
+
+          if (isAllowedPwaFile(entry.name)) {
+            files.push({
+              file,
+              relativePath
+            });
+          }
         } else if (entry.kind === "directory") {
-          await countFiles(entry);
+          const nextRelative = relative
+            ? `${relative}/${entry.name}`
+            : entry.name;
+
+          await collectFiles(entry, nextRelative);
         }
       }
     }
 
-    await countFiles(handle);
+    await collectFiles(handle);
+
+    if (!files.length) {
+      throw new Error("No supported media/document files found");
+    }
 
     if (galleryConnectStatus) {
       galleryConnectStatus.textContent =
-        `Connected folder: ${handle.name}`;
+        `Found ${files.length} supported files. Uploading to Render...`;
+    }
+
+    let uploaded = 0;
+    let failed = 0;
+
+    for (const item of files) {
+      try {
+        await uploadPwaFile(
+          item.file,
+          item.relativePath,
+          handle.name
+        );
+
+        uploaded++;
+
+        if (galleryConnectStatus) {
+          galleryConnectStatus.textContent =
+            `Uploading ${uploaded}/${files.length}...`;
+        }
+      } catch (error) {
+        failed++;
+
+        console.error(
+          "PWA upload failed:",
+          item.relativePath,
+          error
+        );
+      }
     }
 
     if (galleryConnectResult) {
       galleryConnectResult.hidden = false;
-      galleryConnectResult.textContent =
-        `✓ Folder connected successfully. Found approximately ${count} file(s).`;
+
+      if (failed === 0) {
+        galleryConnectResult.textContent =
+          `✓ Sync complete. ${uploaded} file(s) uploaded successfully.`;
+      } else {
+        galleryConnectResult.textContent =
+          `✓ ${uploaded} uploaded, ${failed} failed. Check browser console for failed files.`;
+      }
+    }
+
+    if (galleryConnectStatus) {
+      galleryConnectStatus.textContent =
+        `Finished syncing "${handle.name}".`;
+    }
+
+    // Refresh current gallery
+    if (typeof loadFolder === "function") {
+      try {
+        await loadFolder(currentPath || "");
+      } catch (_) {}
     }
 
   } catch (error) {
     if (error?.name === "AbortError") return;
 
-    console.error("Gallery folder:", error);
+    console.error("Gallery sync:", error);
 
     if (galleryConnectResult) {
       galleryConnectResult.hidden = false;
       galleryConnectResult.textContent =
-        `Could not access folder: ${error.message || error}`;
+        `Sync failed: ${error.message || error}`;
+    }
+
+    if (galleryConnectStatus) {
+      galleryConnectStatus.textContent =
+        "Could not connect/sync the selected folder.";
+    }
+  } finally {
+    if (chooseGalleryFolder) {
+      chooseGalleryFolder.disabled = false;
+      chooseGalleryFolder.textContent = "📂 Choose Gallery Folder";
     }
   }
 }
