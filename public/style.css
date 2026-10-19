@@ -619,3 +619,71 @@ section {
   color: #ff6b6b;
   margin-top: 14px;
 }
+
+
+/* ========================================
+   PWA / Gallery Connection
+   ======================================== */
+
+#pwaInstallBtn[hidden] {
+  display: none !important;
+}
+
+#galleryConnectModal[hidden] {
+  display: none !important;
+}
+
+#galleryConnectModal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+#galleryConnectModal .modal-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #151820;
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+}
+
+#galleryConnectModal h2 {
+  margin: 0 0 12px;
+}
+
+#galleryConnectModal p {
+  color: #aeb4c0;
+  line-height: 1.6;
+}
+
+#galleryConnectModal .modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+#chooseGalleryFolder {
+  margin-top: 12px;
+  width: 100%;
+}
+
+#galleryConnectResult {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.05);
+  color: #cbd1dc;
+  line-height: 1.5;
+}

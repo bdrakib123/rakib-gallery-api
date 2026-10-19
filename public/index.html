@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
+<link rel="manifest" href="/manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rakib Gallery">
 <title>Rakib Gallery</title>
 <link rel="stylesheet" href="/style.css?v=3">
 </head>
@@ -19,7 +24,9 @@
     </div>
   </div>
 
-  <button id="pairSyncBtn" class="top-btn">🔗 Pair Sync</button>
+  <button id="pwaInstallBtn" class="top-btn" hidden>📲 Install App</button>
+<button id="connectGalleryBtn" class="top-btn">📂 Connect Gallery</button>
+<button id="pairSyncBtn" class="top-btn">🔗 Pair Sync</button>
   <button id="historyBtn" class="top-btn">🔐 History</button>
 </header>
 
@@ -154,6 +161,26 @@
 
   </div>
 
+</div>
+
+
+<!-- PWA Gallery Connection -->
+<div id="galleryConnectModal" class="modal" hidden>
+  <div class="modal-card">
+    <button id="closeGalleryConnect" class="modal-close">×</button>
+
+    <h2>📂 Connect Phone Gallery</h2>
+
+    <p id="galleryConnectStatus">
+      Select a folder from your phone to give Rakib Gallery access.
+    </p>
+
+    <button id="chooseGalleryFolder" class="primary-btn">
+      📂 Choose Gallery Folder
+    </button>
+
+    <div id="galleryConnectResult" class="modal-message" hidden></div>
+  </div>
 </div>
 
 </body>

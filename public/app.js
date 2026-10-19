@@ -819,3 +819,176 @@ if (pairSyncModal) {
   );
 
 }
+
+
+// ========================================
+// PWA
+// ========================================
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(() => console.log("Rakib Gallery PWA ready"))
+      .catch(err => console.error("PWA service worker error:", err));
+  });
+}
+
+
+// ========================================
+// PWA INSTALL + PHONE GALLERY PICKER
+// ========================================
+
+let deferredInstallPrompt = null;
+
+const pwaInstallBtn = document.getElementById("pwaInstallBtn");
+const connectGalleryBtn = document.getElementById("connectGalleryBtn");
+const galleryConnectModal = document.getElementById("galleryConnectModal");
+const closeGalleryConnect = document.getElementById("closeGalleryConnect");
+const chooseGalleryFolder = document.getElementById("chooseGalleryFolder");
+const galleryConnectStatus = document.getElementById("galleryConnectStatus");
+const galleryConnectResult = document.getElementById("galleryConnectResult");
+
+window.addEventListener("beforeinstallprompt", event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+
+  if (pwaInstallBtn) {
+    pwaInstallBtn.hidden = false;
+  }
+});
+
+if (pwaInstallBtn) {
+  pwaInstallBtn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+
+    try {
+      await deferredInstallPrompt.userChoice;
+    } catch (error) {
+      console.error("PWA install:", error);
+    }
+
+    deferredInstallPrompt = null;
+    pwaInstallBtn.hidden = true;
+  });
+}
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+
+  if (pwaInstallBtn) {
+    pwaInstallBtn.hidden = true;
+  }
+});
+
+function openGalleryConnectModal() {
+  if (!galleryConnectModal) return;
+
+  galleryConnectModal.hidden = false;
+
+  if (galleryConnectStatus) {
+    galleryConnectStatus.textContent =
+      "Select a phone folder such as DCIM or Pictures.";
+  }
+
+  if (galleryConnectResult) {
+    galleryConnectResult.hidden = true;
+    galleryConnectResult.textContent = "";
+  }
+}
+
+function closeGalleryConnectModal() {
+  if (galleryConnectModal) {
+    galleryConnectModal.hidden = true;
+  }
+}
+
+if (connectGalleryBtn) {
+  connectGalleryBtn.addEventListener("click", openGalleryConnectModal);
+}
+
+if (closeGalleryConnect) {
+  closeGalleryConnect.addEventListener("click", closeGalleryConnectModal);
+}
+
+if (galleryConnectModal) {
+  galleryConnectModal.addEventListener("click", event => {
+    if (event.target === galleryConnectModal) {
+      closeGalleryConnectModal();
+    }
+  });
+}
+
+async function chooseGalleryDirectory() {
+  if (!window.showDirectoryPicker) {
+    if (galleryConnectResult) {
+      galleryConnectResult.hidden = false;
+      galleryConnectResult.textContent =
+        "এই browser-এ folder picker supported নয়। Android Chrome-এর latest version ব্যবহার করে চেষ্টা করো।";
+    }
+    return;
+  }
+
+  try {
+    const handle = await window.showDirectoryPicker({
+      mode: "read"
+    });
+
+    if (!handle) return;
+
+    let permission = "prompt";
+
+    if (typeof handle.queryPermission === "function") {
+      permission = await handle.queryPermission({ mode: "read" });
+
+      if (permission !== "granted") {
+        permission = await handle.requestPermission({ mode: "read" });
+      }
+    }
+
+    if (permission !== "granted" && typeof handle.queryPermission === "function") {
+      throw new Error("Folder permission was not granted");
+    }
+
+    let count = 0;
+
+    async function countFiles(directory) {
+      for await (const entry of directory.values()) {
+        if (entry.kind === "file") {
+          count++;
+        } else if (entry.kind === "directory") {
+          await countFiles(entry);
+        }
+      }
+    }
+
+    await countFiles(handle);
+
+    if (galleryConnectStatus) {
+      galleryConnectStatus.textContent =
+        `Connected folder: ${handle.name}`;
+    }
+
+    if (galleryConnectResult) {
+      galleryConnectResult.hidden = false;
+      galleryConnectResult.textContent =
+        `✓ Folder connected successfully. Found approximately ${count} file(s).`;
+    }
+
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+
+    console.error("Gallery folder:", error);
+
+    if (galleryConnectResult) {
+      galleryConnectResult.hidden = false;
+      galleryConnectResult.textContent =
+        `Could not access folder: ${error.message || error}`;
+    }
+  }
+}
+
+if (chooseGalleryFolder) {
+  chooseGalleryFolder.addEventListener("click", chooseGalleryDirectory);
+}
